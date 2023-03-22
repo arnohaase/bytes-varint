@@ -1,6 +1,6 @@
 [package]
 name = "bytes-varint"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2021"
 authors = [
     "Arno Haase <arno.haase@haase-consulting.com>",
@@ -13,6 +13,7 @@ keywords = [
 ]
 license = "MIT"
 repository = "https://github.com/arnohaase/bytes-varint"
+documentation = "https://docs.rs/bytes-varint"
 
 [dependencies]
 bytes = "1"
