@@ -1,6 +1,6 @@
 [package]
 name = "bytes-varint"
-version = "0.9.0"
+version = "1.0.0"
 edition = "2021"
 authors = [
     "Arno Haase <arno.haase@haase-consulting.com>",
