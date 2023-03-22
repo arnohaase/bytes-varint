@@ -5,7 +5,7 @@ edition = "2021"
 authors = [
     "Arno Haase <arno.haase@haase-consulting.com>",
 ]
-description = "variable-length integer encoding for the Bytes crate"
+description = "variable-length integer encoding (protobuf-style) for the `bytes` crate"
 keywords = [
     "bytes",
     "varint",
