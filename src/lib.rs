@@ -18,13 +18,13 @@
 //! * buffer underflow - there is no way to know in advance how many bytes will be read when decoding
 //!     a number. So callers can not check in advance, and decoding can fail.
 //!
-//! Variable-length encoding (see https://en.wikipedia.org/wiki/Variable-length_quantity for details
+//! Variable-length encoding (see <https://en.wikipedia.org/wiki/Variable-length_quantity> for details
 //!  and trade-offs) stores a number in a sequence of bytes, using each byte's seven least
 //!  significant bits storing actual data, and the most significant bit specifying if there are
 //!  more bytes to come. This allows small numbers to be stored in a single byte regardless of
 //!  the raw value's number of bits.
 //!
-//! Signed integers are 'zig-zag' encoded (https://developers.google.com/protocol-buffers/docs/encoding#types),
+//! Signed integers are 'zig-zag' encoded (<https://developers.google.com/protocol-buffers/docs/encoding#types>),
 //!  mapping the range of `-64` to `63` to a single byte.
 
 use core::cmp::Ordering;
