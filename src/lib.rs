@@ -27,7 +27,6 @@
 //! Signed integers are 'zig-zag' encoded (https://developers.google.com/protocol-buffers/docs/encoding#types),
 //!  mapping the range of `-64` to `63` to a single byte.
 
-
 use core::cmp::Ordering;
 
 /// Variable-length decoding can fail, and callers have no way of performing checks up-front to
@@ -49,7 +48,6 @@ pub enum VarIntError {
 /// Convenience alias for decoding functions
 pub type VarIntResult<T> = Result<T, VarIntError>;
 
-
 /// Functions for reading variable-length encoded integers into various integer types.
 ///
 /// This trait is not meant to be implemented by application code, but is the basis for a
@@ -68,7 +66,7 @@ pub trait VarIntSupport: bytes::Buf {
 
             // shift grows in increments of 7, and 2*7 is the largest shift possible without
             //  potentially losing significant bits
-            let has_overflow = match shift.cmp(&(2*7)) {
+            let has_overflow = match shift.cmp(&(2 * 7)) {
                 Ordering::Less => false,
                 Ordering::Equal => next & !0x03 != 0,
                 Ordering::Greater => true,
@@ -99,7 +97,7 @@ pub trait VarIntSupport: bytes::Buf {
 
             // shift grows in increments of 7, and 4*7 is the largest shift possible without
             //  potentially losing significant bits
-            let has_overflow = match shift.cmp(&(4*7)) {
+            let has_overflow = match shift.cmp(&(4 * 7)) {
                 Ordering::Less => false,
                 Ordering::Equal => next & !0x0f != 0,
                 Ordering::Greater => true,
@@ -130,7 +128,7 @@ pub trait VarIntSupport: bytes::Buf {
 
             // shift grows in increments of 7, and 9*7 is the largest shift possible without
             //  potentially losing significant bits
-            let has_overflow = match shift.cmp(&(9*7)) {
+            let has_overflow = match shift.cmp(&(9 * 7)) {
                 Ordering::Less => false,
                 Ordering::Equal => next & !0x01 != 0,
                 Ordering::Greater => true,
@@ -161,7 +159,7 @@ pub trait VarIntSupport: bytes::Buf {
 
             // shift grows in increments of 7, and 18*7 is the largest shift possible without
             //  potentially losing significant bits
-            let has_overflow = match shift.cmp(&(18*7)) {
+            let has_overflow = match shift.cmp(&(18 * 7)) {
                 Ordering::Less => false,
                 Ordering::Equal => next & !0x03 != 0,
                 Ordering::Greater => true,
@@ -184,11 +182,9 @@ pub trait VarIntSupport: bytes::Buf {
         let raw = self.get_u16_varint()?;
         if (raw & 1) == 0 {
             Ok((raw >> 1) as i16)
-        }
-        else if raw == u16::MAX {
+        } else if raw == u16::MAX {
             Ok(i16::MIN)
-        }
-        else {
+        } else {
             Ok(-(((raw + 1) >> 1) as i16))
         }
     }
@@ -198,11 +194,9 @@ pub trait VarIntSupport: bytes::Buf {
         let raw = self.get_u32_varint()?;
         if (raw & 1) == 0 {
             Ok((raw >> 1) as i32)
-        }
-        else if raw == u32::MAX {
+        } else if raw == u32::MAX {
             Ok(i32::MIN)
-        }
-        else {
+        } else {
             Ok(-(((raw + 1) >> 1) as i32))
         }
     }
@@ -212,11 +206,9 @@ pub trait VarIntSupport: bytes::Buf {
         let raw = self.get_u64_varint()?;
         if (raw & 1) == 0 {
             Ok((raw >> 1) as i64)
-        }
-        else if raw == u64::MAX {
+        } else if raw == u64::MAX {
             Ok(i64::MIN)
-        }
-        else {
+        } else {
             Ok(-(((raw + 1) >> 1) as i64))
         }
     }
@@ -226,16 +218,13 @@ pub trait VarIntSupport: bytes::Buf {
         let raw = self.get_u128_varint()?;
         if (raw & 1) == 0 {
             Ok((raw >> 1) as i128)
-        }
-        else if raw == u128::MAX {
+        } else if raw == u128::MAX {
             Ok(i128::MIN)
-        }
-        else {
+        } else {
             Ok(-(((raw + 1) >> 1) as i128))
         }
     }
 }
-
 
 /// Functions for writing variable-length encoded integers.
 ///
@@ -282,11 +271,9 @@ pub trait VarIntSupportMut: bytes::BufMut {
     fn put_i16_varint(&mut self, value: i16) {
         if value >= 0 {
             self.put_u16_varint((value as u16) << 1)
-        }
-        else if value == i16::MIN {
+        } else if value == i16::MIN {
             self.put_u16_varint(u16::MAX)
-        }
-        else {
+        } else {
             self.put_u16_varint(((-value as u16) << 1) - 1)
         }
     }
@@ -295,11 +282,9 @@ pub trait VarIntSupportMut: bytes::BufMut {
     fn put_i32_varint(&mut self, value: i32) {
         if value >= 0 {
             self.put_u32_varint((value as u32) << 1)
-        }
-        else if value == i32::MIN {
+        } else if value == i32::MIN {
             self.put_u32_varint(u32::MAX)
-        }
-        else {
+        } else {
             self.put_u32_varint(((-value as u32) << 1) - 1)
         }
     }
@@ -308,11 +293,9 @@ pub trait VarIntSupportMut: bytes::BufMut {
     fn put_i64_varint(&mut self, value: i64) {
         if value >= 0 {
             self.put_u64_varint((value as u64) << 1)
-        }
-        else if value == i64::MIN {
+        } else if value == i64::MIN {
             self.put_u64_varint(u64::MAX)
-        }
-        else {
+        } else {
             self.put_u64_varint(((-value as u64) << 1) - 1)
         }
     }
@@ -321,21 +304,18 @@ pub trait VarIntSupportMut: bytes::BufMut {
     fn put_i128_varint(&mut self, value: i128) {
         if value >= 0 {
             self.put_u128_varint((value as u128) << 1)
-        }
-        else if value == i128::MIN {
+        } else if value == i128::MIN {
             self.put_u128_varint(u128::MAX)
-        }
-        else {
+        } else {
             self.put_u128_varint(((-value as u128) << 1) - 1)
         }
     }
 }
 
-
 // blanket implementations for seamless integration with bytes::Buf / bytes::BufMut
 
-impl <T: bytes::Buf> VarIntSupport for T {}
-impl <T: bytes::BufMut> VarIntSupportMut for T {}
+impl<T: bytes::Buf> VarIntSupport for T {}
+impl<T: bytes::BufMut> VarIntSupportMut for T {}
 
 #[cfg(test)]
 mod test {
