@@ -1,142 +1,190 @@
 
+//TODO RustDoc
+// format
+// why 'VarIntResult'
+//
 //TODO unit tests
-//TODO explain 'overflow'
-//TODO interact with 'panic on eof'
 //TODO feature for bigint
 
+use std::cmp::Ordering;
+
+pub enum VarIntError {
+    NumericOverflow,
+    BufferUnderflow,
+}
+
+pub type VarIntResult<T> = Result<T, VarIntError>;
 
 pub trait VarIntSupport: bytes::Buf {
-    fn decode_varint_u16(&mut self, overflow: &mut bool) -> u16 {
+    fn get_u16_varint(&mut self) -> VarIntResult<u16> {
         let mut result = 0;
         let mut shift = 0;
 
         loop {
+            if !self.has_remaining() {
+                return Err(VarIntError::BufferUnderflow);
+            }
             let next = self.get_u8() as u16;
-            if shift > 16-7 {
-                *overflow = true;
-                return 0;
+
+            // shift grows in increments of 7, and 2*7 is the largest shift possible without
+            //  potentially losing significant bits
+            let has_overflow = match shift.cmp(&(2*7)) {
+                Ordering::Less => false,
+                Ordering::Equal => next & !0x03 != 0,
+                Ordering::Greater => true,
+            };
+            if has_overflow {
+                return Err(VarIntError::NumericOverflow);
             }
+
             result += (next & 0x7F) << shift;
-            shift += 7;
             if next & 0x80 == 0 {
                 break;
             }
+            shift += 7;
         }
-
-        *overflow = false;
-        result
+        Ok(result)
     }
 
-    fn decode_varint_u32(&mut self, overflow: &mut bool) -> u32 {
+    fn get_u32_varint(&mut self) -> VarIntResult<u32> {
         let mut result = 0;
         let mut shift = 0;
 
         loop {
+            if !self.has_remaining() {
+                return Err(VarIntError::BufferUnderflow);
+            }
             let next = self.get_u8() as u32;
-            if shift > 32-7 {
-                *overflow = true;
-                return 0;
+
+            // shift grows in increments of 7, and 4*7 is the largest shift possible without
+            //  potentially losing significant bits
+            let has_overflow = match shift.cmp(&(4*7)) {
+                Ordering::Less => false,
+                Ordering::Equal => next & !0x07 != 0,
+                Ordering::Greater => true,
+            };
+            if has_overflow {
+                return Err(VarIntError::NumericOverflow);
             }
+
             result += (next & 0x7F) << shift;
-            shift += 7;
             if next & 0x80 == 0 {
                 break;
             }
+            shift += 7;
         }
-
-        *overflow = false;
-        result
+        Ok(result)
     }
 
-    fn get_u64_varint(&mut self, overflow: &mut bool) -> u64 {
+    fn get_u64_varint(&mut self) -> VarIntResult<u64> {
         let mut result = 0;
         let mut shift = 0;
 
         loop {
+            if !self.has_remaining() {
+                return Err(VarIntError::BufferUnderflow);
+            }
             let next = self.get_u8() as u64;
-            if shift > 64-7 {
-                *overflow = true;
-                return 0;
+
+            // shift grows in increments of 7, and 9*7 is the largest shift possible without
+            //  potentially losing significant bits
+            let has_overflow = match shift.cmp(&(9*7)) {
+                Ordering::Less => false,
+                Ordering::Equal => next & !0x01 != 0,
+                Ordering::Greater => true,
+            };
+            if has_overflow {
+                return Err(VarIntError::NumericOverflow);
             }
+
             result += (next & 0x7F) << shift;
-            shift += 7;
             if next & 0x80 == 0 {
                 break;
             }
+            shift += 7;
         }
-
-        *overflow = false;
-        result
+        Ok(result)
     }
 
-    fn get_u128_varint(&mut self, overflow: &mut bool) -> u128 {
+    fn get_u128_varint(&mut self) -> VarIntResult<u128> {
         let mut result = 0;
         let mut shift = 0;
 
         loop {
-            let next = self.get_u8() as u128;
-            result += (next & 0x7F) << shift;
-            if shift > 128-7 {
-                *overflow = true;
-                return 0;
+            if !self.has_remaining() {
+                return Err(VarIntError::BufferUnderflow);
             }
-            shift += 7;
+            let next = self.get_u8() as u128;
+
+            // shift grows in increments of 7, and 18*7 is the largest shift possible without
+            //  potentially losing significant bits
+            let has_overflow = match shift.cmp(&(18*7)) {
+                Ordering::Less => false,
+                Ordering::Equal => next & !0x02 != 0,
+                Ordering::Greater => true,
+            };
+            if has_overflow {
+                return Err(VarIntError::NumericOverflow);
+            }
+
+            result += (next & 0x7F) << shift;
             if next & 0x80 == 0 {
                 break;
             }
+            shift += 7;
         }
-        result
+        Ok(result)
     }
 
-    fn get_i128_varint(&mut self) -> i128 {
-        let raw = self.get_u128_varint();
+    fn get_i128_varint(&mut self) -> VarIntResult<i128> {
+        let raw = self.get_u128_varint()?;
         if (raw & 1) == 0 {
-            (raw >> 1) as i128
+            Ok((raw >> 1) as i128)
         }
         else if raw == u128::MAX {
-            i128::MIN
+            Ok(i128::MIN)
         }
         else {
-            -(((raw + 1) >> 1) as i128)
+            Ok(-(((raw + 1) >> 1) as i128))
         }
     }
 
-    fn get_i64_varint(&mut self) -> i64 {
-        let raw = self.get_u64_varint();
+    fn get_i64_varint(&mut self) -> VarIntResult<i64> {
+        let raw = self.get_u64_varint()?;
         if (raw & 1) == 0 {
-            (raw >> 1) as i64
+            Ok((raw >> 1) as i64)
         }
         else if raw == u64::MAX {
-            i64::MIN
+            Ok(i64::MIN)
         }
         else {
-            -(((raw + 1) >> 1) as i64)
+            Ok(-(((raw + 1) >> 1) as i64))
         }
     }
 
-    fn get_i32_varint(&mut self) -> i32 {
-        let raw = self.get_u32_varint();
-        if (raw&1) == 0 {
-            (raw >> 1) as i32
+    fn get_i32_varint(&mut self) -> VarIntResult<i32> {
+        let raw = self.get_u32_varint()?;
+        if (raw & 1) == 0 {
+            Ok((raw >> 1) as i32)
         }
         else if raw == u32::MAX {
-            i32::MIN
+            Ok(i32::MIN)
         }
         else {
-            -(((raw + 1) >> 1) as i32)
+            Ok(-(((raw + 1) >> 1) as i32))
         }
     }
 
-    fn get_i16_varint(&mut self) -> i16 {
-        let raw = self.get_u16_varint();
-        if (raw&1) == 0 {
-            (raw >> 1) as i16
+    fn get_i16_varint(&mut self) -> VarIntResult<i16> {
+        let raw = self.get_u16_varint()?;
+        if (raw & 1) == 0 {
+            Ok((raw >> 1) as i16)
         }
         else if raw == u16::MAX {
-            i16::MIN
+            Ok(i16::MIN)
         }
         else {
-            -(((raw + 1) >> 1) as i16)
+            Ok(-(((raw + 1) >> 1) as i16))
         }
     }
 }
