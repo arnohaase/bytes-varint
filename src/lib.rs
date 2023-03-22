@@ -28,6 +28,75 @@
 //!  mapping the range of `-64` to `63` to a single byte.
 
 use core::cmp::Ordering;
+use core::mem::size_of;
+
+macro_rules! get_impl {
+    ($self: expr, $ty:ty) => {{
+        let mut result = 0;
+        let mut shift = 0;
+
+        loop {
+            if !$self.has_remaining() {
+                return Err(VarIntError::BufferUnderflow);
+            }
+            let next = $self.get_u8() as $ty;
+
+            let has_overflow = match shift.cmp(&(size_of::<$ty>() * 8 / 7 * 7)) {
+                Ordering::Less => false,
+                Ordering::Equal => {
+                    next & (((u8::MAX << (size_of::<$ty>() % 7)) & 0xff) as $ty) != 0
+                }
+                Ordering::Greater => true,
+            };
+            if has_overflow {
+                return Err(VarIntError::NumericOverflow);
+            }
+
+            result += (next & 0x7F) << shift;
+            if next & 0x80 == 0 {
+                break;
+            }
+            shift += 7;
+        }
+        Ok(result)
+    }};
+}
+
+macro_rules! put_impl {
+    ($self:expr, $value:expr) => {
+        while $value >= 0x80 {
+            $self.put_u8((($value & 0x7F) | 0x80) as u8);
+            $value >>= 7;
+        }
+        $self.put_u8($value as u8);
+    };
+}
+
+macro_rules! decode_signed {
+    ($value:expr, $unsigned:ty => $signed:ty) => {{
+        let v = $value;
+        if (v & 1) == 0 {
+            (v >> 1) as $signed
+        } else if v == <$unsigned>::MAX {
+            <$signed>::MIN
+        } else {
+            -(((v + 1) >> 1) as $signed)
+        }
+    }};
+}
+
+macro_rules! encode_signed {
+    ($value:expr, $signed:ty => $unsigned:ty) => {{
+        let v = $value;
+        if v >= 0 {
+            (v as $unsigned) << 1
+        } else if v == <$signed>::MIN {
+            <$unsigned>::MAX
+        } else {
+            ((-v as $unsigned) << 1) - 1
+        }
+    }};
+}
 
 /// Variable-length decoding can fail, and callers have no way of performing checks up-front to
 ///  ensure success. This is different from fixed-length decoding that is guaranteed to succeed if
@@ -64,174 +133,42 @@ pub type VarIntResult<T> = Result<T, VarIntError>;
 pub trait VarIntSupport: bytes::Buf {
     /// Read a variable-length encoded integer value into a u16.
     fn get_u16_varint(&mut self) -> VarIntResult<u16> {
-        let mut result = 0;
-        let mut shift = 0;
-
-        loop {
-            if !self.has_remaining() {
-                return Err(VarIntError::BufferUnderflow);
-            }
-            let next = self.get_u8() as u16;
-
-            // shift grows in increments of 7, and 2*7 is the largest shift possible without
-            //  potentially losing significant bits
-            let has_overflow = match shift.cmp(&(2 * 7)) {
-                Ordering::Less => false,
-                Ordering::Equal => next & !0x03 != 0,
-                Ordering::Greater => true,
-            };
-            if has_overflow {
-                return Err(VarIntError::NumericOverflow);
-            }
-
-            result += (next & 0x7F) << shift;
-            if next & 0x80 == 0 {
-                break;
-            }
-            shift += 7;
-        }
-        Ok(result)
+        get_impl!(self, u16)
     }
 
     /// Read a variable-length encoded integer value into a u32.
     fn get_u32_varint(&mut self) -> VarIntResult<u32> {
-        let mut result = 0;
-        let mut shift = 0;
-
-        loop {
-            if !self.has_remaining() {
-                return Err(VarIntError::BufferUnderflow);
-            }
-            let next = self.get_u8() as u32;
-
-            // shift grows in increments of 7, and 4*7 is the largest shift possible without
-            //  potentially losing significant bits
-            let has_overflow = match shift.cmp(&(4 * 7)) {
-                Ordering::Less => false,
-                Ordering::Equal => next & !0x0f != 0,
-                Ordering::Greater => true,
-            };
-            if has_overflow {
-                return Err(VarIntError::NumericOverflow);
-            }
-
-            result += (next & 0x7F) << shift;
-            if next & 0x80 == 0 {
-                break;
-            }
-            shift += 7;
-        }
-        Ok(result)
+        get_impl!(self, u32)
     }
 
     /// Read a variable-length encoded integer value into a u64.
     fn get_u64_varint(&mut self) -> VarIntResult<u64> {
-        let mut result = 0;
-        let mut shift = 0;
-
-        loop {
-            if !self.has_remaining() {
-                return Err(VarIntError::BufferUnderflow);
-            }
-            let next = self.get_u8() as u64;
-
-            // shift grows in increments of 7, and 9*7 is the largest shift possible without
-            //  potentially losing significant bits
-            let has_overflow = match shift.cmp(&(9 * 7)) {
-                Ordering::Less => false,
-                Ordering::Equal => next & !0x01 != 0,
-                Ordering::Greater => true,
-            };
-            if has_overflow {
-                return Err(VarIntError::NumericOverflow);
-            }
-
-            result += (next & 0x7F) << shift;
-            if next & 0x80 == 0 {
-                break;
-            }
-            shift += 7;
-        }
-        Ok(result)
+        get_impl!(self, u64)
     }
 
     /// Read a variable-length encoded integer value into a u128.
     fn get_u128_varint(&mut self) -> VarIntResult<u128> {
-        let mut result = 0;
-        let mut shift = 0;
-
-        loop {
-            if !self.has_remaining() {
-                return Err(VarIntError::BufferUnderflow);
-            }
-            let next = self.get_u8() as u128;
-
-            // shift grows in increments of 7, and 18*7 is the largest shift possible without
-            //  potentially losing significant bits
-            let has_overflow = match shift.cmp(&(18 * 7)) {
-                Ordering::Less => false,
-                Ordering::Equal => next & !0x03 != 0,
-                Ordering::Greater => true,
-            };
-            if has_overflow {
-                return Err(VarIntError::NumericOverflow);
-            }
-
-            result += (next & 0x7F) << shift;
-            if next & 0x80 == 0 {
-                break;
-            }
-            shift += 7;
-        }
-        Ok(result)
+        get_impl!(self, u128)
     }
 
     /// Read a variable-length encoded integer value into an i16, using zig-zag encoding.
     fn get_i16_varint(&mut self) -> VarIntResult<i16> {
-        let raw = self.get_u16_varint()?;
-        if (raw & 1) == 0 {
-            Ok((raw >> 1) as i16)
-        } else if raw == u16::MAX {
-            Ok(i16::MIN)
-        } else {
-            Ok(-(((raw + 1) >> 1) as i16))
-        }
+        Ok(decode_signed!(self.get_u16_varint()?, u16 => i16))
     }
 
     /// Read a variable-length encoded integer value into an i32, using zig-zag encoding.
     fn get_i32_varint(&mut self) -> VarIntResult<i32> {
-        let raw = self.get_u32_varint()?;
-        if (raw & 1) == 0 {
-            Ok((raw >> 1) as i32)
-        } else if raw == u32::MAX {
-            Ok(i32::MIN)
-        } else {
-            Ok(-(((raw + 1) >> 1) as i32))
-        }
+        Ok(decode_signed!(self.get_u32_varint()?, u32 => i32))
     }
 
     /// Read a variable-length encoded integer value into an i64, using zig-zag encoding.
     fn get_i64_varint(&mut self) -> VarIntResult<i64> {
-        let raw = self.get_u64_varint()?;
-        if (raw & 1) == 0 {
-            Ok((raw >> 1) as i64)
-        } else if raw == u64::MAX {
-            Ok(i64::MIN)
-        } else {
-            Ok(-(((raw + 1) >> 1) as i64))
-        }
+        Ok(decode_signed!(self.get_u64_varint()?, u64 => i64))
     }
 
     /// Read a variable-length encoded integer value into an i128, using zig-zag encoding.
     fn get_i128_varint(&mut self) -> VarIntResult<i128> {
-        let raw = self.get_u128_varint()?;
-        if (raw & 1) == 0 {
-            Ok((raw >> 1) as i128)
-        } else if raw == u128::MAX {
-            Ok(i128::MIN)
-        } else {
-            Ok(-(((raw + 1) >> 1) as i128))
-        }
+        Ok(decode_signed!(self.get_u128_varint()?, u128 => i128))
     }
 }
 
@@ -251,82 +188,42 @@ pub trait VarIntSupport: bytes::Buf {
 pub trait VarIntSupportMut: bytes::BufMut {
     /// Write a u16 to a buffer using variable-length encoding.
     fn put_u16_varint(&mut self, mut value: u16) {
-        while value >= 0x80 {
-            self.put_u8(((value & 0x7F) | 0x80) as u8);
-            value >>= 7;
-        }
-        self.put_u8(value as u8)
+        put_impl!(self, value);
     }
 
     /// Write a u32 to a buffer using variable-length encoding.
     fn put_u32_varint(&mut self, mut value: u32) {
-        while value >= 0x80 {
-            self.put_u8(((value & 0x7F) | 0x80) as u8);
-            value >>= 7;
-        }
-        self.put_u8(value as u8)
+        put_impl!(self, value);
     }
 
     /// Write a u64 to a buffer using variable-length encoding.
     fn put_u64_varint(&mut self, mut value: u64) {
-        while value >= 0x80 {
-            self.put_u8(((value & 0x7F) | 0x80) as u8);
-            value >>= 7;
-        }
-        self.put_u8(value as u8)
+        put_impl!(self, value);
     }
 
     /// Write a u128 to a buffer using variable-length encoding.
     fn put_u128_varint(&mut self, mut value: u128) {
-        while value >= 0x80 {
-            self.put_u8(((value & 0x7F) | 0x80) as u8);
-            value >>= 7;
-        }
-        self.put_u8(value as u8)
+        put_impl!(self, value);
     }
 
     /// Write an i16 to a buffer using variable-length zig-zag encoding.
     fn put_i16_varint(&mut self, value: i16) {
-        if value >= 0 {
-            self.put_u16_varint((value as u16) << 1)
-        } else if value == i16::MIN {
-            self.put_u16_varint(u16::MAX)
-        } else {
-            self.put_u16_varint(((-value as u16) << 1) - 1)
-        }
+        self.put_u16_varint(encode_signed!(value, i16 => u16));
     }
 
     /// Write an i32 to a buffer using variable-length zig-zag encoding.
     fn put_i32_varint(&mut self, value: i32) {
-        if value >= 0 {
-            self.put_u32_varint((value as u32) << 1)
-        } else if value == i32::MIN {
-            self.put_u32_varint(u32::MAX)
-        } else {
-            self.put_u32_varint(((-value as u32) << 1) - 1)
-        }
+        self.put_u32_varint(encode_signed!(value, i32 => u32));
     }
 
     /// Write an i64 to a buffer using variable-length zig-zag encoding.
     fn put_i64_varint(&mut self, value: i64) {
-        if value >= 0 {
-            self.put_u64_varint((value as u64) << 1)
-        } else if value == i64::MIN {
-            self.put_u64_varint(u64::MAX)
-        } else {
-            self.put_u64_varint(((-value as u64) << 1) - 1)
-        }
+        self.put_u64_varint(encode_signed!(value, i64 => u64));
     }
 
     /// Write an i128 to a buffer using variable-length zig-zag encoding.
     fn put_i128_varint(&mut self, value: i128) {
-        if value >= 0 {
-            self.put_u128_varint((value as u128) << 1)
-        } else if value == i128::MIN {
-            self.put_u128_varint(u128::MAX)
-        } else {
-            self.put_u128_varint(((-value as u128) << 1) - 1)
-        }
+        self.put_u128_varint(encode_signed!(value, i128 => u128));
     }
 }
 
