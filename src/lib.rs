@@ -1,23 +1,61 @@
 #![warn(missing_docs, rust_2018_idioms)]
 #![no_std]
 
-//TODO RustDoc
-// format
-// why 'VarIntResult'
-//
-//TODO format
+//! Extends the `bytes` crate with support for variable-length serialization and deserialization
+//!  of integer values.
+//!
+//! This crate is not affiliated with the `bytes` crate, but it integrates seamlessly by providing
+//!  blanket implementations for `bytes::Buf` / `bytes::BufMut`.
+//!
+//! Variable-length decoding can fail, and callers have no way of performing checks up-front to
+//!  ensure success. This is different from fixed-length decoding that is guaranteed to succeed if
+//!  e.g. the buffer has at least four available bytes when decoding an i32.
+//!
+//! There are two failure modes:
+//!
+//! * numeric overflow - the encoding has no inherent upper bound on the number of bits in a number,
+//!     so a decoded number may be too large to fit into a given numeric primitive type
+//! * buffer underflow - there is no way to know in advance how many bytes will be read when decoding
+//!     a number. So callers can not check in advance, and decoding can fail.
+//!
+//! Variable-length encoding (see https://en.wikipedia.org/wiki/Variable-length_quantity for details
+//!  and trade-offs) stores a number in a sequence of bytes, using each byte's seven least
+//!  significant bits storing actual data, and the most significant bit specifying if there are
+//!  more bytes to come. This allows small numbers to be stored in a single byte regardless of
+//!  the raw value's number of bits.
+//!
+//! Signed integers are 'zig-zag' encoded (https://developers.google.com/protocol-buffers/docs/encoding#types),
+//!  mapping the range of `-64` to `63` to a single byte.
+
 
 use core::cmp::Ordering;
 
+/// Variable-length decoding can fail, and callers have no way of performing checks up-front to
+///  ensure success. This is different from fixed-length decoding that is guaranteed to succeed if
+///  e.g. the buffer has at least four available bytes when decoding an i32.
 #[derive(Debug, Eq, PartialEq)]
 pub enum VarIntError {
+    /// Returned if the encoded number has more bits than the primitive integer type into which
+    ///  it is decoded.
+    ///
+    /// Implementations do *not* attempt to consume remaining bytes beyond the target type's
+    ///  capacity, and a numeric overflow leaves the buffer's pointer in an undefined position.
     NumericOverflow,
+    /// Returned if the encoded number specifies that there are more bytes to come, but the buffer
+    ///  has no more available bytes
     BufferUnderflow,
 }
 
+/// Convenience alias for decoding functions
 pub type VarIntResult<T> = Result<T, VarIntError>;
 
+
+/// Functions for reading variable-length encoded integers into various integer types.
+///
+/// This trait is not meant to be implemented by application code, but is the basis for a
+///  blanket implementation for `bytes::Buf`.
 pub trait VarIntSupport: bytes::Buf {
+    /// Read a variable-length encoded integer value into a u16.
     fn get_u16_varint(&mut self) -> VarIntResult<u16> {
         let mut result = 0;
         let mut shift = 0;
@@ -48,6 +86,7 @@ pub trait VarIntSupport: bytes::Buf {
         Ok(result)
     }
 
+    /// Read a variable-length encoded integer value into a u32.
     fn get_u32_varint(&mut self) -> VarIntResult<u32> {
         let mut result = 0;
         let mut shift = 0;
@@ -78,6 +117,7 @@ pub trait VarIntSupport: bytes::Buf {
         Ok(result)
     }
 
+    /// Read a variable-length encoded integer value into a u64.
     fn get_u64_varint(&mut self) -> VarIntResult<u64> {
         let mut result = 0;
         let mut shift = 0;
@@ -108,6 +148,7 @@ pub trait VarIntSupport: bytes::Buf {
         Ok(result)
     }
 
+    /// Read a variable-length encoded integer value into a u128.
     fn get_u128_varint(&mut self) -> VarIntResult<u128> {
         let mut result = 0;
         let mut shift = 0;
@@ -138,6 +179,7 @@ pub trait VarIntSupport: bytes::Buf {
         Ok(result)
     }
 
+    /// Read a variable-length encoded integer value into an i16, using zig-zag encoding.
     fn get_i16_varint(&mut self) -> VarIntResult<i16> {
         let raw = self.get_u16_varint()?;
         if (raw & 1) == 0 {
@@ -151,6 +193,7 @@ pub trait VarIntSupport: bytes::Buf {
         }
     }
 
+    /// Read a variable-length encoded integer value into an i32, using zig-zag encoding.
     fn get_i32_varint(&mut self) -> VarIntResult<i32> {
         let raw = self.get_u32_varint()?;
         if (raw & 1) == 0 {
@@ -164,6 +207,7 @@ pub trait VarIntSupport: bytes::Buf {
         }
     }
 
+    /// Read a variable-length encoded integer value into an i64, using zig-zag encoding.
     fn get_i64_varint(&mut self) -> VarIntResult<i64> {
         let raw = self.get_u64_varint()?;
         if (raw & 1) == 0 {
@@ -177,6 +221,7 @@ pub trait VarIntSupport: bytes::Buf {
         }
     }
 
+    /// Read a variable-length encoded integer value into an i128, using zig-zag encoding.
     fn get_i128_varint(&mut self) -> VarIntResult<i128> {
         let raw = self.get_u128_varint()?;
         if (raw & 1) == 0 {
@@ -191,7 +236,13 @@ pub trait VarIntSupport: bytes::Buf {
     }
 }
 
+
+/// Functions for writing variable-length encoded integers.
+///
+/// This trait is not meant to be implemented by application code, but is the basis for a
+///  blanket implementation for `bytes::BufMut`.
 pub trait VarIntSupportMut: bytes::BufMut {
+    /// Write a u16 to a buffer using variable-length encoding.
     fn put_u16_varint(&mut self, mut value: u16) {
         while value >= 0x80 {
             self.put_u8(((value & 0x7F) | 0x80) as u8);
@@ -200,6 +251,7 @@ pub trait VarIntSupportMut: bytes::BufMut {
         self.put_u8(value as u8)
     }
 
+    /// Write a u32 to a buffer using variable-length encoding.
     fn put_u32_varint(&mut self, mut value: u32) {
         while value >= 0x80 {
             self.put_u8(((value & 0x7F) | 0x80) as u8);
@@ -208,6 +260,7 @@ pub trait VarIntSupportMut: bytes::BufMut {
         self.put_u8(value as u8)
     }
 
+    /// Write a u64 to a buffer using variable-length encoding.
     fn put_u64_varint(&mut self, mut value: u64) {
         while value >= 0x80 {
             self.put_u8(((value & 0x7F) | 0x80) as u8);
@@ -216,6 +269,7 @@ pub trait VarIntSupportMut: bytes::BufMut {
         self.put_u8(value as u8)
     }
 
+    /// Write a u128 to a buffer using variable-length encoding.
     fn put_u128_varint(&mut self, mut value: u128) {
         while value >= 0x80 {
             self.put_u8(((value & 0x7F) | 0x80) as u8);
@@ -224,6 +278,7 @@ pub trait VarIntSupportMut: bytes::BufMut {
         self.put_u8(value as u8)
     }
 
+    /// Write an i16 to a buffer using variable-length zig-zag encoding.
     fn put_i16_varint(&mut self, value: i16) {
         if value >= 0 {
             self.put_u16_varint((value as u16) << 1)
@@ -236,6 +291,7 @@ pub trait VarIntSupportMut: bytes::BufMut {
         }
     }
 
+    /// Write an i32 to a buffer using variable-length zig-zag encoding.
     fn put_i32_varint(&mut self, value: i32) {
         if value >= 0 {
             self.put_u32_varint((value as u32) << 1)
@@ -248,6 +304,7 @@ pub trait VarIntSupportMut: bytes::BufMut {
         }
     }
 
+    /// Write an i64 to a buffer using variable-length zig-zag encoding.
     fn put_i64_varint(&mut self, value: i64) {
         if value >= 0 {
             self.put_u64_varint((value as u64) << 1)
@@ -260,6 +317,7 @@ pub trait VarIntSupportMut: bytes::BufMut {
         }
     }
 
+    /// Write an i128 to a buffer using variable-length zig-zag encoding.
     fn put_i128_varint(&mut self, value: i128) {
         if value >= 0 {
             self.put_u128_varint((value as u128) << 1)
@@ -274,7 +332,8 @@ pub trait VarIntSupportMut: bytes::BufMut {
 }
 
 
-//TODO documentation - blanket implementation
+// blanket implementations for seamless integration with bytes::Buf / bytes::BufMut
+
 impl <T: bytes::Buf> VarIntSupport for T {}
 impl <T: bytes::BufMut> VarIntSupportMut for T {}
 
