@@ -52,6 +52,15 @@ pub type VarIntResult<T> = Result<T, VarIntError>;
 ///
 /// This trait is not meant to be implemented by application code, but is the basis for a
 ///  blanket implementation for `bytes::Buf`.
+///
+/// Importing the trait makes the functions available on any `Buf` instance:
+/// ```
+/// use bytes_varint::*;
+///
+/// fn get_number(buf: &mut impl bytes::Buf) -> VarIntResult<u32> {
+///     buf.get_u32_varint()
+/// }
+/// ```
 pub trait VarIntSupport: bytes::Buf {
     /// Read a variable-length encoded integer value into a u16.
     fn get_u16_varint(&mut self) -> VarIntResult<u16> {
@@ -230,6 +239,15 @@ pub trait VarIntSupport: bytes::Buf {
 ///
 /// This trait is not meant to be implemented by application code, but is the basis for a
 ///  blanket implementation for `bytes::BufMut`.
+///
+/// Importing the trait makes the functions available on any `BufMut` instance:
+/// ```
+/// use bytes_varint::*;
+///
+/// fn get_number(buf: &mut impl bytes::BufMut, n: u32) {
+///     buf.put_u32_varint(n);
+/// }
+/// ```
 pub trait VarIntSupportMut: bytes::BufMut {
     /// Write a u16 to a buffer using variable-length encoding.
     fn put_u16_varint(&mut self, mut value: u16) {
