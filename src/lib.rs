@@ -230,6 +230,7 @@ pub trait VarIntSupport: bytes::Buf {
         Ok(decode_signed!(self.try_get_u128_varint()?, u128 => i128))
     }
 
+    /// Read a variable-length encoded integer value into an i128, using zig-zag encoding.
     fn try_get_isize_varint(&mut self) -> VarIntResult<isize> {
         Ok(decode_signed!(self.try_get_usize_varint()?, usize => isize))
     }

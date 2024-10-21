@@ -1,4 +1,7 @@
-
+//! Extends the `bytes` crate with functions to read fixed-length numbers wrapped in buffer
+//!  underflow checks. This is often useful when working with variable-length encoded buffers.
+//!
+//! This is in a separate module to make it easy to ignore when it is not needed.
 
 macro_rules! get_try_impl {
     ($try_getter: ident, $ty:ty, $getter: ident) => {
