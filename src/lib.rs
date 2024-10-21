@@ -27,6 +27,8 @@
 //! Signed integers are 'zig-zag' encoded (<https://developers.google.com/protocol-buffers/docs/encoding#types>),
 //!  mapping the range of `-64` to `63` to a single byte.
 
+pub mod try_get_fixed;
+
 use core::cmp::Ordering;
 use core::error::Error;
 use core::fmt::{Debug, Display, Formatter};
