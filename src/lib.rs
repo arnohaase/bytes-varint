@@ -28,6 +28,8 @@
 //!  mapping the range of `-64` to `63` to a single byte.
 
 use core::cmp::Ordering;
+use core::error::Error;
+use core::fmt::{Debug, Display, Formatter};
 use core::mem::size_of;
 
 macro_rules! get_impl {
@@ -114,6 +116,16 @@ pub enum VarIntError {
     BufferUnderflow,
 }
 
+impl Display for VarIntError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        Debug::fmt(self, f)
+    }
+}
+
+impl Error for VarIntError {
+}
+
+
 /// Convenience alias for decoding functions
 pub type VarIntResult<T> = Result<T, VarIntError>;
 
@@ -132,43 +144,92 @@ pub type VarIntResult<T> = Result<T, VarIntError>;
 /// ```
 pub trait VarIntSupport: bytes::Buf {
     /// Read a variable-length encoded integer value into a u16.
+    #[deprecated(since = "1.1.0", note="Please use try_get_u16_varint instead for consistency with Rust naming conventions")]
     fn get_u16_varint(&mut self) -> VarIntResult<u16> {
+        self.try_get_u16_varint()
+    }
+        /// Read a variable-length encoded integer value into a u16.
+    fn try_get_u16_varint(&mut self) -> VarIntResult<u16> {
         get_impl!(self, u16)
     }
 
     /// Read a variable-length encoded integer value into a u32.
+    #[deprecated(since = "1.1.0", note="Please use try_get_u32_varint instead for consistency with Rust naming conventions")]
     fn get_u32_varint(&mut self) -> VarIntResult<u32> {
+        self.try_get_u32_varint()
+    }
+    /// Read a variable-length encoded integer value into a u32.
+    fn try_get_u32_varint(&mut self) -> VarIntResult<u32> {
         get_impl!(self, u32)
     }
 
     /// Read a variable-length encoded integer value into a u64.
+    #[deprecated(since = "1.1.0", note="Please use try_get_u64_varint instead for consistency with Rust naming conventions")]
     fn get_u64_varint(&mut self) -> VarIntResult<u64> {
+        self.try_get_u64_varint()
+    }
+    /// Read a variable-length encoded integer value into a u64.
+    fn try_get_u64_varint(&mut self) -> VarIntResult<u64> {
         get_impl!(self, u64)
     }
 
     /// Read a variable-length encoded integer value into a u128.
+    #[deprecated(since = "1.1.0", note="Please use try_get_u128_varint instead for consistency with Rust naming conventions")]
     fn get_u128_varint(&mut self) -> VarIntResult<u128> {
+        self.try_get_u128_varint()
+    }
+    /// Read a variable-length encoded integer value into a u128.
+    fn try_get_u128_varint(&mut self) -> VarIntResult<u128> {
         get_impl!(self, u128)
     }
 
+    /// Read a variable-length encoded integer value into a usize
+    fn try_get_usize_varint(&mut self) -> VarIntResult<usize> {
+        get_impl!(self, usize)
+    }
+
     /// Read a variable-length encoded integer value into an i16, using zig-zag encoding.
+    #[deprecated(since = "1.1.0", note="Please use try_get_i16_varint instead for consistency with Rust naming conventions")]
     fn get_i16_varint(&mut self) -> VarIntResult<i16> {
-        Ok(decode_signed!(self.get_u16_varint()?, u16 => i16))
+        self.try_get_i16_varint()
+    }
+    /// Read a variable-length encoded integer value into an i16, using zig-zag encoding.
+    fn try_get_i16_varint(&mut self) -> VarIntResult<i16> {
+        Ok(decode_signed!(self.try_get_u16_varint()?, u16 => i16))
     }
 
     /// Read a variable-length encoded integer value into an i32, using zig-zag encoding.
+    #[deprecated(since = "1.1.0", note="Please use try_get_i32_varint instead for consistency with Rust naming conventions")]
     fn get_i32_varint(&mut self) -> VarIntResult<i32> {
-        Ok(decode_signed!(self.get_u32_varint()?, u32 => i32))
+        self.try_get_i32_varint()
+    }
+    /// Read a variable-length encoded integer value into an i32, using zig-zag encoding.
+    fn try_get_i32_varint(&mut self) -> VarIntResult<i32> {
+        Ok(decode_signed!(self.try_get_u32_varint()?, u32 => i32))
     }
 
     /// Read a variable-length encoded integer value into an i64, using zig-zag encoding.
+    #[deprecated(since = "1.1.0", note="Please use try_get_i64_varint instead for consistency with Rust naming conventions")]
     fn get_i64_varint(&mut self) -> VarIntResult<i64> {
-        Ok(decode_signed!(self.get_u64_varint()?, u64 => i64))
+        self.try_get_i64_varint()
+    }
+    /// Read a variable-length encoded integer value into an i64, using zig-zag encoding.
+    fn try_get_i64_varint(&mut self) -> VarIntResult<i64> {
+        Ok(decode_signed!(self.try_get_u64_varint()?, u64 => i64))
     }
 
     /// Read a variable-length encoded integer value into an i128, using zig-zag encoding.
+    #[deprecated(since = "1.1.0", note="Please use try_get_i128_varint instead for consistency with Rust naming conventions")]
     fn get_i128_varint(&mut self) -> VarIntResult<i128> {
-        Ok(decode_signed!(self.get_u128_varint()?, u128 => i128))
+        self.try_get_i128_varint()
+    }
+    /// Read a variable-length encoded integer value into an i128, using zig-zag encoding.
+    fn try_get_i128_varint(&mut self) -> VarIntResult<i128> {
+        Ok(decode_signed!(self.try_get_u128_varint()?, u128 => i128))
+    }
+
+    fn try_get_isize_varint(&mut self) -> VarIntResult<isize> {
+        Ok(decode_signed!(self.try_get_usize_varint()?, usize => isize))
     }
 }
 
@@ -206,6 +267,13 @@ pub trait VarIntSupportMut: bytes::BufMut {
         put_impl!(self, value);
     }
 
+    /// Write a usize to a buffer using variable-length encoding. Note that the use of var-length
+    ///  encoding allows using usize for external interfaces without introducing platform
+    ///  dependencies.
+    fn put_usize_varint(&mut self, mut value: usize) {
+        put_impl!(self, value);
+    }
+
     /// Write an i16 to a buffer using variable-length zig-zag encoding.
     fn put_i16_varint(&mut self, value: i16) {
         self.put_u16_varint(encode_signed!(value, i16 => u16));
@@ -224,6 +292,13 @@ pub trait VarIntSupportMut: bytes::BufMut {
     /// Write an i128 to a buffer using variable-length zig-zag encoding.
     fn put_i128_varint(&mut self, value: i128) {
         self.put_u128_varint(encode_signed!(value, i128 => u128));
+    }
+
+    /// Write an isize to a buffer using variable-length encoding. Note that the use of var-length
+    ///  encoding allows using usize for external interfaces without introducing platform
+    ///  dependencies.
+    fn put_isize_varint(&mut self, value: isize) {
+        self.put_usize_varint(encode_signed!(value, isize => usize));
     }
 }
 
@@ -254,7 +329,10 @@ mod test {
     fn test_u16(#[case] bytes: Vec<u8>, #[case] expected: VarIntResult<u16>) {
         let mut bytes = bytes;
         let mut buf: &[u8] = &mut bytes;
-        assert_eq!(expected, buf.get_u16_varint());
+
+        #[allow(deprecated)]
+        let actual = buf.get_u16_varint();
+        assert_eq!(expected, actual);
         assert!(!buf.has_remaining());
 
         if let Ok(n) = expected {
@@ -275,7 +353,10 @@ mod test {
     fn test_u32(#[case] bytes: Vec<u8>, #[case] expected: VarIntResult<u32>) {
         let mut bytes = bytes;
         let mut buf: &[u8] = &mut bytes;
-        assert_eq!(expected, buf.get_u32_varint());
+
+        #[allow(deprecated)]
+        let actual = buf.get_u32_varint();
+        assert_eq!(expected, actual);
         assert!(!buf.has_remaining());
 
         if let Ok(n) = expected {
@@ -296,7 +377,10 @@ mod test {
     fn test_u64(#[case] bytes: Vec<u8>, #[case] expected: VarIntResult<u64>) {
         let mut bytes = bytes;
         let mut buf: &[u8] = &mut bytes;
-        assert_eq!(expected, buf.get_u64_varint());
+
+        #[allow(deprecated)]
+        let actual = buf.get_u64_varint();
+        assert_eq!(expected, actual);
         assert!(!buf.has_remaining());
 
         if let Ok(n) = expected {
@@ -317,12 +401,97 @@ mod test {
     fn test_u128(#[case] bytes: Vec<u8>, #[case] expected: VarIntResult<u128>) {
         let mut bytes = bytes;
         let mut buf: &[u8] = &mut bytes;
-        assert_eq!(expected, buf.get_u128_varint());
+
+        #[allow(deprecated)]
+        let actual = buf.get_u128_varint();
+        assert_eq!(expected, actual);
         assert!(!buf.has_remaining());
 
         if let Ok(n) = expected {
             let mut write_buf = Vec::new();
             write_buf.put_u128_varint(n);
+            assert_eq!(bytes, write_buf);
+        }
+    }
+
+    #[rstest]
+    #[case::n_0(vec![0], Ok(0))]
+    #[case::n_1(vec![1], Ok(1))]
+    #[case::n_129(vec![0x81, 1], Ok(129))]
+    #[case::buf_empty(vec![], Err(VarIntError::BufferUnderflow))]
+    #[case::buf_underflow(vec![0x80], Err(VarIntError::BufferUnderflow))]
+    fn test_usize(#[case] bytes: Vec<u8>, #[case] expected: VarIntResult<usize>) {
+        let mut bytes = bytes;
+        let mut buf: &[u8] = &mut bytes;
+
+        #[allow(deprecated)]
+        let actual = buf.try_get_usize_varint();
+        assert_eq!(expected, actual);
+        assert!(!buf.has_remaining());
+
+        if let Ok(n) = expected {
+            let mut write_buf = Vec::new();
+            write_buf.put_usize_varint(n);
+            assert_eq!(bytes, write_buf);
+        }
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case::max         (vec![0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01], Ok(usize::MAX))]
+    #[case::num_overflow(vec![0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x02], Err(VarIntError::NumericOverflow))]
+    fn test_usize_64bit(#[case] bytes: Vec<u8>, #[case] expected: VarIntResult<usize>) {
+        let mut bytes = bytes;
+        let mut buf: &[u8] = &mut bytes;
+
+        #[allow(deprecated)]
+        let actual = buf.try_get_usize_varint();
+        assert_eq!(expected, actual);
+        assert!(!buf.has_remaining());
+
+        if let Ok(n) = expected {
+            let mut write_buf = Vec::new();
+            write_buf.put_usize_varint(n);
+            assert_eq!(bytes, write_buf);
+        }
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    #[rstest]
+    #[case::max         (vec![0xff, 0xff, 0xff, 0xff, 0x0f], Ok(usize::MAX))]
+    #[case::num_overflow(vec![0xff, 0xff, 0xff, 0xff, 0x10], Err(VarIntError::NumericOverflow))]
+    fn test_usize_32bit(#[case] bytes: Vec<u8>, #[case] expected: VarIntResult<usize>) {
+        let mut bytes = bytes;
+        let mut buf: &[u8] = &mut bytes;
+
+        #[allow(deprecated)]
+        let actual = buf.try_get_usize_varint();
+        assert_eq!(expected, actual);
+        assert!(!buf.has_remaining());
+
+        if let Ok(n) = expected {
+            let mut write_buf = Vec::new();
+            write_buf.put_usize_varint(n);
+            assert_eq!(bytes, write_buf);
+        }
+    }
+
+    #[cfg(target_pointer_width = "16")]
+    #[rstest]
+    #[case::max         (vec![0xff, 0xff, 0x03], Ok(usize::MAX))]
+    #[case::num_overflow(vec![0xff, 0xff, 0x04], Err(VarIntError::NumericOverflow))]
+    fn test_usize_16bit(#[case] bytes: Vec<u8>, #[case] expected: VarIntResult<usize>) {
+        let mut bytes = bytes;
+        let mut buf: &[u8] = &mut bytes;
+
+        #[allow(deprecated)]
+        let actual = buf.try_get_usize_varint();
+        assert_eq!(expected, actual);
+        assert!(!buf.has_remaining());
+
+        if let Ok(n) = expected {
+            let mut write_buf = Vec::new();
+            write_buf.put_usize_varint(n);
             assert_eq!(bytes, write_buf);
         }
     }
@@ -343,7 +512,10 @@ mod test {
     fn test_i16(#[case] bytes: Vec<u8>, #[case] expected: VarIntResult<i16>) {
         let mut bytes = bytes;
         let mut buf: &[u8] = &mut bytes;
-        assert_eq!(expected, buf.get_i16_varint());
+
+        #[allow(deprecated)]
+        let actual = buf.get_i16_varint();
+        assert_eq!(expected, actual);
         assert!(!buf.has_remaining());
 
         if let Ok(n) = expected {
@@ -369,7 +541,10 @@ mod test {
     fn test_i32(#[case] bytes: Vec<u8>, #[case] expected: VarIntResult<i32>) {
         let mut bytes = bytes;
         let mut buf: &[u8] = &mut bytes;
-        assert_eq!(expected, buf.get_i32_varint());
+
+        #[allow(deprecated)]
+        let actual = buf.get_i32_varint();
+        assert_eq!(expected, actual);
         assert!(!buf.has_remaining());
 
         if let Ok(n) = expected {
@@ -395,7 +570,10 @@ mod test {
     fn test_i64(#[case] bytes: Vec<u8>, #[case] expected: VarIntResult<i64>) {
         let mut bytes = bytes;
         let mut buf: &[u8] = &mut bytes;
-        assert_eq!(expected, buf.get_i64_varint());
+
+        #[allow(deprecated)]
+        let actual = buf.get_i64_varint();
+        assert_eq!(expected, actual);
         assert!(!buf.has_remaining());
 
         if let Ok(n) = expected {
@@ -421,12 +599,108 @@ mod test {
     fn test_i128(#[case] bytes: Vec<u8>, #[case] expected: VarIntResult<i128>) {
         let mut bytes = bytes;
         let mut buf: &[u8] = &mut bytes;
-        assert_eq!(expected, buf.get_i128_varint());
+
+        #[allow(deprecated)]
+        let actual = buf.get_i128_varint();
+        assert_eq!(expected, actual);
         assert!(!buf.has_remaining());
 
         if let Ok(n) = expected {
             let mut write_buf = Vec::new();
             write_buf.put_i128_varint(n);
+            assert_eq!(bytes, write_buf);
+        }
+    }
+
+    #[rstest]
+    #[case::n_0(vec![0], Ok(0))]
+    #[case::n_1(vec![2], Ok(1))]
+    #[case::n_128(vec![0x80, 0x2], Ok(128))]
+    #[case::minus_1(vec![0x1], Ok(-1))]
+    #[case::minus_129(vec![0x1], Ok(-1))]
+    #[case::buf_empty(vec![], Err(VarIntError::BufferUnderflow))]
+    #[case::buf_underflow(vec![0x80], Err(VarIntError::BufferUnderflow))]
+    fn test_isize(#[case] bytes: Vec<u8>, #[case] expected: VarIntResult<isize>) {
+        let mut bytes = bytes;
+        let mut buf: &[u8] = &mut bytes;
+
+        #[allow(deprecated)]
+        let actual = buf.try_get_isize_varint();
+        assert_eq!(expected, actual);
+        assert!(!buf.has_remaining());
+
+        if let Ok(n) = expected {
+            let mut write_buf = Vec::new();
+            write_buf.put_isize_varint(n);
+            assert_eq!(bytes, write_buf);
+        }
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[rstest]
+    #[case::max               (vec![0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01], Ok(isize::MAX))]
+    #[case::minus_max         (vec![0xfd, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01], Ok(-isize::MAX))]
+    #[case::min               (vec![0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01], Ok(isize::MIN))]
+    #[case::num_overflow_plus (vec![0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x02], Err(VarIntError::NumericOverflow))]
+    #[case::num_overflow_minus(vec![0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x02], Err(VarIntError::NumericOverflow))]
+    fn test_isize_64bit(#[case] bytes: Vec<u8>, #[case] expected: VarIntResult<isize>) {
+        let mut bytes = bytes;
+        let mut buf: &[u8] = &mut bytes;
+
+        #[allow(deprecated)]
+            let actual = buf.try_get_isize_varint();
+        assert_eq!(expected, actual);
+        assert!(!buf.has_remaining());
+
+        if let Ok(n) = expected {
+            let mut write_buf = Vec::new();
+            write_buf.put_isize_varint(n);
+            assert_eq!(bytes, write_buf);
+        }
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    #[rstest]
+    #[case::max               (vec![0xfe, 0xff, 0xff, 0xff, 0x0f], Ok(isize::MAX))]
+    #[case::minus_max         (vec![0xfd, 0xff, 0xff, 0xff, 0x0f], Ok(-isize::MAX))]
+    #[case::min               (vec![0xff, 0xff, 0xff, 0xff, 0x0f], Ok(isize::MIN))]
+    #[case::num_overflow_plus (vec![0xfe, 0xff, 0xff, 0xff, 0x10], Err(VarIntError::NumericOverflow))]
+    #[case::num_overflow_minus(vec![0xff, 0xff, 0xff, 0xff, 0x10], Err(VarIntError::NumericOverflow))]
+    fn test_isize_64bit(#[case] bytes: Vec<u8>, #[case] expected: VarIntResult<isize>) {
+        let mut bytes = bytes;
+        let mut buf: &[u8] = &mut bytes;
+
+        #[allow(deprecated)]
+            let actual = buf.try_get_isize_varint();
+        assert_eq!(expected, actual);
+        assert!(!buf.has_remaining());
+
+        if let Ok(n) = expected {
+            let mut write_buf = Vec::new();
+            write_buf.put_isize_varint(n);
+            assert_eq!(bytes, write_buf);
+        }
+    }
+
+    #[cfg(target_pointer_width = "16")]
+    #[rstest]
+    #[case::max               (vec![0xfe, 0xff, 0x03], Ok(isize::MAX))]
+    #[case::minus_max         (vec![0xfd, 0xff, 0x03], Ok(-isize::MAX))]
+    #[case::min               (vec![0xff, 0xff, 0x03], Ok(isize::MIN))]
+    #[case::num_overflow_plus (vec![0xfe, 0xff, 0x04], Err(VarIntError::NumericOverflow))]
+    #[case::num_overflow_minus(vec![0xff, 0xff, 0x04], Err(VarIntError::NumericOverflow))]
+    fn test_isize_64bit(#[case] bytes: Vec<u8>, #[case] expected: VarIntResult<isize>) {
+        let mut bytes = bytes;
+        let mut buf: &[u8] = &mut bytes;
+
+        #[allow(deprecated)]
+            let actual = buf.try_get_isize_varint();
+        assert_eq!(expected, actual);
+        assert!(!buf.has_remaining());
+
+        if let Ok(n) = expected {
+            let mut write_buf = Vec::new();
+            write_buf.put_isize_varint(n);
             assert_eq!(bytes, write_buf);
         }
     }
