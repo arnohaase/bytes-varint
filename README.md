@@ -46,3 +46,15 @@ Variable-length encoding (see https://en.wikipedia.org/wiki/Variable-length_quan
 
 Signed integers are 'zig-zag' encoded (https://developers.google.com/protocol-buffers/docs/encoding#types),
   mapping the range of `-64` to `63` to a single byte.
+
+## Release Notes
+
+### 1.1.0
+* `VarIntError` implements the `Error` trait now that it has become stable in `no_std`
+* Rename `get_u32_varint()` to `try_get_u32_varint()` etc. to be more in line with Rust naming conventions.
+    The old functions are deprecated and will remain for the foreseeable future.
+* Add `put_usize_varint()`, `put_isize_varint()`, `try_get_usize_varint()` and `try_get_isize_varint()`
+
+
+
+
